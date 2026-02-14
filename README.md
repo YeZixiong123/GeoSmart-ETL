@@ -39,8 +39,8 @@ S3 ハイブリッド・クライアント: boto3 をベースにカプセル化
 2. AI インサイトアシスタント
 
 DeepSeek-V3 を活用し、地形データに基づいた植栽推奨ロジックを展開。
-<img width="2405" height="1179" alt="image" src="https://github.com/user-attachments/assets/8ac1ba1f-10b9-4fe6-a5ed-fc87c9c7a689" />
-<img width="1137" height="926" alt="image" src="https://github.com/user-attachments/assets/738f010b-7979-45af-81f0-c6ff7fe9b69a" />
+<img width="2367" height="1050" alt="image" src="https://github.com/user-attachments/assets/12a70994-f803-4a08-9192-632861684fa3" />
+
 
 
 🛠️ 技術スタック
