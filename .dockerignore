@@ -1,0 +1,9 @@
+*.pyc
+env/
+venv/
+.vscode/
+uploads/
+processed/
+*.csv
+*.parquet
+*.json

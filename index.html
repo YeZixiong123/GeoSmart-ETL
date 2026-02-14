@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoSmart-ETL　知能分析プラットフォーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+    <nav class="bg-slate-800 border-b border-slate-700 p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold text-emerald-400"><i class="fas fa-layer-group mr-2"></i>GeoSmart-ETL</h1>
+            <div id="cost-badge" class="bg-slate-700 px-3 py-1 rounded-full text-[10px] text-slate-400 border border-slate-600">
+                Total Session Tokens: <span id="total-tokens" class="text-emerald-400 font-mono">0</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="space-y-6">
+            <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-lg">
+                <h2 class="text-lg font-semibold mb-4 text-emerald-300"><i class="fas fa-upload mr-2"></i>データの取り込み</h2>
+                <div class="flex items-center space-x-4">
+                    <input type="file" id="fileInput" class="block w-full text-sm text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700"/>
+                    <button onclick="uploadFile()" id="uploadBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-6 rounded-lg transition">开始分析</button>
+                </div>
+            </div>
+            <div id="dashboard" class="hidden bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-lg">
+                <h2 class="text-lg font-semibold mb-4 text-blue-300"><i class="fas fa-chart-pie mr-2"></i>データ資産の概要</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-slate-700 p-4 rounded-lg"><p class="text-slate-400 text-xs">総サンプルサイズ</p><p class="text-2xl font-bold text-white" id="stat-rows">0</p></div>
+                    <div class="bg-slate-700 p-4 rounded-lg"><p class="text-slate-400 text-xs">平均高度</p><p class="text-2xl font-bold text-white" id="stat-elevation">0m</p></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg flex flex-col h-[600px]">
+            <div class="p-4 border-b border-slate-700 bg-slate-800 rounded-t-xl flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-purple-300"><i class="fas fa-robot mr-2"></i>AIインサイトアシスタント</h2>
+                <span class="text-[10px] text-slate-500">DeepSeek-V3</span>
+            </div>
+            <div id="chatBox" class="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-900/50"></div>
+            <div class="p-4 border-t border-slate-700 bg-slate-800 rounded-b-xl">
+                <div class="flex space-x-2">
+                    <input type="text" id="chatInput" placeholder="問題入力...." class="flex-1 bg-slate-700 text-white border-none rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none" onkeypress="if(event.key === 'Enter') sendChat()">
+                    <button onclick="sendChat()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let sessionTokens = 0;
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput.files.length === 0) return alert("まずCSVファイルを選択してください");
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+            try {
+                const response = await fetch('/analyze', { method: 'POST', body: formData });
+                const result = await response.json();
+                if (response.ok) {
+                    document.getElementById('dashboard').classList.remove('hidden');
+                    document.getElementById('stat-rows').innerText = result.ai_insight_source.dataset_rows;
+                    document.getElementById('stat-elevation').innerText = result.ai_insight_source.elevation_mean.toFixed(1) + " m";
+                    addMessage("ai", "✅ 分析完了！データ概要を読みました。標高、土壌、分布などについてご質問いただけます。");
+                }
+            } catch (e) { alert("ネットワークエラー"); }
+        }
+
+        async function sendChat() {
+            const input = document.getElementById('chatInput');
+            const query = input.value.trim();
+            if (!query) return;
+            addMessage("user", query);
+            input.value = "";
+            const loadingId = addMessage("ai", "思考中...", true);
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+                const result = await response.json();
+                document.getElementById(loadingId).remove();
+                if (response.ok) {
+                    addMessage("ai", result.answer, false, result.usage);
+                    updateTokenCounter(result.usage.total_tokens);
+                }
+            } catch (e) { document.getElementById(loadingId).remove(); addMessage("ai", "接続エラー"); }
+        }
+
+        function updateTokenCounter(newTokens) {
+            sessionTokens += newTokens;
+            document.getElementById('total-tokens').innerText = sessionTokens;
+        }
+
+        function addMessage(role, text, isLoading=false, usage=null) {
+            const box = document.getElementById('chatBox');
+            const div = document.createElement('div');
+            const id = "msg-" + Date.now();
+            div.id = id;
+            div.className = `flex flex-col ${role === 'user' ? 'items-end' : 'items-start'}`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = `p-3 rounded-lg max-w-[85%] text-sm ${role === 'user' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-white'} ${isLoading ? 'animate-pulse' : ''}`;
+            bubble.innerHTML = text.replace(/\n/g, '<br>');
+            
+            div.appendChild(bubble);
+
+            if (usage && usage.total_tokens) {
+                const badge = document.createElement('div');
+                badge.className = "text-[9px] text-slate-500 mt-1 px-1";
+                badge.innerHTML = `<i class="fas fa-coins mr-1"></i>Used ${usage.total_tokens} tokens (Cost: ~$${(usage.total_tokens * 0.0000002).toFixed(6)})`;
+                div.appendChild(badge);
+            }
+
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+            return id;
+        }
+    </script>
+</body>
+</html>
